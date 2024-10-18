@@ -10,7 +10,7 @@ const scheduleSchema = new mongoose.Schema({
         required: true
     },
     availableSlot: {
-        type: String,
+        type: Number,
         required: true
     },
     schedAvailability: {

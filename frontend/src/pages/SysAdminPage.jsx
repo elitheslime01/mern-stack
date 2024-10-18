@@ -1,6 +1,7 @@
-import { Box, Button, Container, Heading, Input, VStack } from "@chakra-ui/react";
-import { useState } from "react"
+import { Box, Button, Container, Heading, Input, SimpleGrid, useToast, VStack } from "@chakra-ui/react";
+import { useEffect, useState } from "react"
 import { useScheduleStore } from "../store/schedule";
+import ScheduleCard from "../components/ScheduleCard";
 
 const SysAdminPage = () => {
   const [newSchedule, setNewSchedule] = useState({
@@ -9,14 +10,41 @@ const SysAdminPage = () => {
     availableSlot: "",
     schedAvailability: "",
   });
+
+  const toast = useToast()
   
   const {createSchedule} = useScheduleStore()
+
   const handleAddSchedule = async() => {
-    console.log("Submitting schedule:", newSchedule);
     const {success, message} = await createSchedule(newSchedule)
-    console.log("Success: ", success)
-    console.log("Message: ", message)
+    if (!success) {
+      toast({
+        title: "Error",
+        description: message,
+        status: "error",
+        isClosable: true
+      })
+    } else {
+      toast({
+        title: "Success",
+        description: message,
+        status: "success",
+        isClosable: true
+      })
+    }
+    setNewSchedule({
+      schedDate: "",
+      schedTime: "",
+      availableSlot: "",
+      schedAvailability: "",
+    });
   }
+
+  const {fetchSchedules, schedules} = useScheduleStore();
+  useEffect(() => {
+    fetchSchedules();
+  }, [fetchSchedules]);
+  console.log("Schedules: ", schedules);
 
   return (
     <Container maxW = {"container.sm"}>
@@ -44,7 +72,7 @@ const SysAdminPage = () => {
               placeholder="Enter Available Slot"
               name="Available Slot"
               value={newSchedule.availableSlot}
-              onChange={(e) => setNewSchedule({...newSchedule, availableSlot: e.target.value})}
+              onChange={(e) => setNewSchedule({...newSchedule, availableSlot: Number(e.target.value)})}
             />
             <Input
               placeholder="Enter Schedule Availability (Available/Unavailable/Under Maintenance)"
@@ -57,6 +85,16 @@ const SysAdminPage = () => {
             </Button>
           </VStack>
         </Box>
+
+        <Container maxW={"full"} p={6} rounded={"lg"} shadow={"md"}>
+          <VStack spacing={5}>
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+              {schedules.map((schedule) => {
+                return <ScheduleCard key={schedule._id} schedule={schedule} />
+              })}
+            </SimpleGrid>
+          </VStack>
+        </Container>
 
       </VStack>
     </Container>
