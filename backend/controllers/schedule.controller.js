@@ -15,7 +15,7 @@ export const createSchedule = async (req, res) => {
     const schedule = req.body; //user will send this data
 
     if (!schedule.schedDate || !schedule.schedTime || !schedule.availableSlot || !schedule.schedAvailability) {
-        return res.status(400).json({ success:flase, message: "Please fill in all fields" });
+        return res.status(400).json({ success:false, message: "Please fill in all fields" });
     }
 
     const newSchedule = new Schedule(schedule);
