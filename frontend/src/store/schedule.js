@@ -46,23 +46,27 @@ export const useScheduleStore = create((set) => ({
         }
     },
     deleteSchedule: async (sid) => {
-        try {
-            const res = await fetch('/api/schedules/'+sid, {
-                method: 'DELETE',
-            });
-            if (!res.ok) {
-                const errorData = await res.json();
-                console.error('Server error:', errorData);
-                return {success: false, message: errorData.message || "Failed to delete schedule"}
-            }
-            const data = await res.json();
-            if (!data.success) {
-                return {success: false, message: data.message }
-            }
-            set((state) => ({schedules: state.schedules.filter(schedule => schedule.id !== sid) }));
-        } catch (error) {
-            console.error('Error fetching schedule:', error);
-            return {success: false, message: "An error occurred while deleting the schedule"}
-        }
-    }
-}))
+        const res = await fetch('/api/schedules/'+sid, {
+            method: 'DELETE',
+        });
+        const data = await res.json();
+        if (!data.success) return {success: false, message: data.message };
+        set((state) => ({schedules: state.schedules.filter((schedule) => schedule._id !== sid) }));
+        return {success: true, message: data.message}
+    },
+    updateSchedule: async (sid, updatedSchedule) => {
+        const res = await fetch('/api/schedules/'+sid, {
+            method: 'PATCH',
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(updatedSchedule),
+        });
+        const data = await res.json();
+        if (!data.success) return {success: false, message: data.message };
+        set((state) => ({
+            schedules: state.schedules.map((schedule) => (schedule._id === sid ? data.data : schedule)),
+        }));
+        return {success: true, message: data.message}
+    },
+}));

@@ -22,6 +22,7 @@ const SysAdminPage = () => {
         title: "Error",
         description: message,
         status: "error",
+        duration: 3000,
         isClosable: true
       })
     } else {
@@ -29,6 +30,7 @@ const SysAdminPage = () => {
         title: "Success",
         description: message,
         status: "success",
+        duration: 3000,
         isClosable: true
       })
     }
@@ -50,7 +52,7 @@ const SysAdminPage = () => {
     <Container maxW = {"container.sm"}>
       <VStack spacing = {8}>
 
-      <Heading as={"h1"} fontSize={"4xl"} textAlign={"center"} mb={8}>
+      <Heading as={"h1"} fontSize={"4xl"} textAlign={"center"} mt={8}>
         Create New Schedule
       </Heading>
 
@@ -85,6 +87,10 @@ const SysAdminPage = () => {
             </Button>
           </VStack>
         </Box>
+
+        <Heading as={"h1"} fontSize={"4xl"} textAlign={"center"} >
+          Schedules
+        </Heading>
 
         <Container maxW={"full"} p={6} rounded={"lg"} shadow={"md"}>
           <VStack spacing={5}>

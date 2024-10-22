@@ -2,6 +2,9 @@ import express from "express";
 import dotenv from "dotenv";
 import { connectDB } from "./config/db.js";
 import schedulesRoutes from "./routes/schedule.route.js";
+import bookingsRoutes from "./routes/booking.route.js";
+import studentsRoutes from "./routes/student.route.js";
+import queuesRoutes from "./routes/queue.route.js";
 
 dotenv.config();
 
@@ -16,3 +19,6 @@ app.listen(PORT, () => {
 });
 
 app.use("/api/schedules", schedulesRoutes)
+app.use("/api/bookings", bookingsRoutes)
+app.use("/api/students", studentsRoutes)
+app.use("/api/queues", queuesRoutes)
