@@ -1,31 +1,58 @@
-import mongoose from "mongoose";
-
-// Define a sub-schema for student entries in the queue
+// models/queue.model.js
 const studentQueueSchema = new mongoose.Schema({
   studentID: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: 'Student',
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: 'Student'
+  },
+  enqueueTime: {
+      type: Number,
+      default: Date.now
+  },
+  basePriority: {
+      type: Number,
+      default: 30  // Default priority for regular students
+  },
+  isAthlete: {
+      type: Boolean,
+      default: false
   }
 }, {
-  timestamps: true  // This adds createdAt and updatedAt for each student entry
+  timestamps: true
 });
 
-// Define the main queue schema
 const queueSchema = new mongoose.Schema({
   scheduleID: {
-    type: mongoose.Schema.Types.ObjectId,
-    required: true,
-    ref: 'Schedule'
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: 'Schedule'
   },
-  queueAthletes: [studentQueueSchema],  // Use the sub-schema for athletes
-  queueOrdinaryStudents: [studentQueueSchema]  // Use the sub-schema for ordinary students
+  queueAthletes: [studentQueueSchema],
+  queueOrdinaryStudents: [studentQueueSchema]
 }, {
-  timestamps: true  // This adds createdAt and updatedAt for the overall queue document
+  timestamps: true
 });
 
-// Create the Queue model
-const Queue = mongoose.model('Queue', queueSchema);
+// Calculate priority based on waiting time and student type
+queueSchema.methods.calculatePriority = function(student) {
+  const waitingTime = (Date.now() - student.enqueueTime) / 1000 / 60; // Convert to minutes
+  const basePriority = student.isAthlete ? 50 : 30; // Athletes get higher base priority
+  return basePriority + waitingTime; // Priority increases with waiting time
+};
 
-// Export the Queue model
+// Get all students sorted by priority
+queueSchema.methods.getPrioritizedStudents = function() {
+  const allStudents = [
+      ...this.queueAthletes.map(s => ({...s.toObject(), isAthlete: true})),
+      ...this.queueOrdinaryStudents.map(s => ({...s.toObject(), isAthlete: false}))
+  ];
+
+  return allStudents.sort((a, b) => {
+      const priorityA = this.calculatePriority(a);
+      const priorityB = this.calculatePriority(b);
+      return priorityB - priorityA;
+  });
+};
+
+const Queue = mongoose.model('Queue', queueSchema);
 export default Queue;
