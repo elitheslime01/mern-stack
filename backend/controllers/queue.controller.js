@@ -134,3 +134,70 @@ export const getQueueForSchedule = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
+export const advanceTime = async (req, res) => {
+    const { queueId } = req.params;
+    const { minutes } = req.body;
+
+    try {
+        const queue = await Queue.findById(queueId);
+        if (!queue) {
+            return res.status(404).json({ success: false, message: "Queue not found" });
+        }
+
+        const advanceMs = minutes * 60 * 1000;
+        queue.queueAthletes.forEach(student => {
+            student.enqueueTime -= advanceMs;
+        });
+        queue.queueOrdinaryStudents.forEach(student => {
+            student.enqueueTime -= advanceMs;
+        });
+
+        await queue.save();
+
+        res.status(200).json({ success: true, message: "Queue time advanced successfully" });
+    } catch (error) {
+        console.error("Error in advanceTime: ", error.message);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+export const addStudentToQueue = async (req, res) => {
+    const { queueId } = req.params;
+    const { studentID, isAthlete } = req.body;
+
+    // Check if studentID is provided
+    if (!studentID) {
+        return res.status(400).json({ success: false, message: "studentID is required" });
+    }
+
+    try {
+        const queue = await Queue.findById(queueId);
+        if (!queue) {
+            return res.status(404).json({ success: false, message: "Queue not found" });
+        }
+
+        const newStudent = {
+            studentID,
+            enqueueTime: Date.now()
+        };
+
+        if (isAthlete) {
+            queue.queueAthletes.push(newStudent);
+        } else {
+            queue.queueOrdinaryStudents.push(newStudent);
+        }
+
+        await queue.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Student added to queue successfully",
+            data: queue
+        });
+
+    } catch (error) {
+        console.error("Error in addStudentToQueue: ", error.message);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};

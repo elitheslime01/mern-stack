@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 // models/queue.model.js
 const studentQueueSchema = new mongoose.Schema({
   studentID: {
