@@ -7,17 +7,21 @@ const studentQueueSchema = new mongoose.Schema({
       required: true,
       ref: 'Student'
   },
+  name: {
+    type: String,
+    required: true
+  },
   enqueueTime: {
       type: Number,
       default: Date.now
   },
   basePriority: {
       type: Number,
-      default: 30  // Default priority for regular students
+      default: 0  // Default priority for regular students
   },
   isAthlete: {
       type: Boolean,
-      default: false
+      required: true
   }
 }, {
   timestamps: true
@@ -38,7 +42,7 @@ const queueSchema = new mongoose.Schema({
 // Calculate priority based on waiting time and student type
 queueSchema.methods.calculatePriority = function(student) {
   const waitingTime = (Date.now() - student.enqueueTime) / 1000 / 60; // Convert to minutes
-  const basePriority = student.isAthlete ? 50 : 30; // Athletes get higher base priority
+  const basePriority = student.isAthlete ? 30 : 0; // Athletes get higher base priority
   return basePriority + waitingTime; // Priority increases with waiting time
 };
 

@@ -13,6 +13,9 @@ const router = express.Router();
 // Get all queues
 router.get("/", getQueues);
 
+// Get queue for a specific schedule
+router.get('/schedule/:scheduleID', getQueueForSchedule);
+
 // Create a new queue
 router.post("/", createQueue);
 
@@ -24,9 +27,6 @@ router.post('/:queueId/advanceTime', advanceTime);
 
 // Add student for the queue
 router.patch('/:queueId/addStudent', addStudentToQueue);
-
-// Get queue for a specific schedule
-router.get('/schedule/:scheduleID', getQueueForSchedule);
 
 const queuesRoutes = router;
 

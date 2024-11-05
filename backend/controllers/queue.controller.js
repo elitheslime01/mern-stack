@@ -1,6 +1,7 @@
 import Queue from "../models/queue.model.js";
 import Booking from "../models/booking.model.js";
 import Schedule from "../models/schedule.model.js";
+import Student from "../models/student.model.js";
 import mongoose from "mongoose";
 
 export const getQueues = async (req, res) => {
@@ -14,21 +15,53 @@ export const getQueues = async (req, res) => {
 }
 
 export const createQueue = async (req, res) => {
-    const { scheduleID, queueAthletes, queueOrdinaryStudents } = req.body;
+    const { scheduleID, studentID } = req.body;
 
-    if (!scheduleID || !queueAthletes || !queueOrdinaryStudents) {
-        return res.status(400).json({ success: false, message: "Please provide scheduleID, queueAthletes, and queueOrdinaryStudents" });
+    // Check if scheduleID and studentID are provided
+    if (!scheduleID || !studentID) {
+        return res.status(400).json({ success: false, message: "Please provide scheduleID and studentID" });
     }
 
-    const newQueue = new Queue({
-        scheduleID,
-        queueAthletes: queueAthletes.map(athlete => ({ studentID: athlete.studentID })),
-        queueOrdinaryStudents: queueOrdinaryStudents.map(student => ({ studentID: student.studentID }))
-    });
-
     try {
+        // Validate student ID
+        if (!mongoose.Types.ObjectId.isValid(studentID)) {
+            return res.status(400).json({ success: false, message: `Invalid student ID: ${studentID}` });
+        }
+
+        // Fetch the student to get their isAthlete status
+        const student = await Student.findById(studentID);
+        if (!student) {
+            return res.status(404).json({ success: false, message: `Student not found for ID: ${studentID}` });
+        }
+
+        // Create a new queue instance
+        const newQueue = new Queue({ scheduleID });
+
+        // Set base priority based on isAthlete status
+        const basePriority = student.isAthlete ? 30 : 0;
+
+        const newStudentInQueue = {
+            studentID: student._id,
+            name: student.name,
+            enqueueTime: Date.now(),
+            isAthlete: student.isAthlete,
+            basePriority: basePriority 
+        };
+        // Add the student to the appropriate queue
+        if (student.isAthlete) {
+            newQueue.queueAthletes.push(newStudentInQueue);
+        } else {
+            newQueue.queueOrdinaryStudents.push(newStudentInQueue);
+        }
+
+        // Save the new queue
         await newQueue.save();
-        res.status(201).json({ success: true, data: newQueue });
+
+        res.status(201).json({
+            success: true,
+            data: newQueue
+        });
+
     } catch (error) {
         console.error("Error in Create Queue: ", error.message);
         res.status(500).json({ success: false, message: "Server Error" });
@@ -164,28 +197,45 @@ export const advanceTime = async (req, res) => {
 
 export const addStudentToQueue = async (req, res) => {
     const { queueId } = req.params;
-    const { studentID, isAthlete } = req.body;
+    const { studentID } = req.body;
 
-    // Check if studentID is provided
     if (!studentID) {
         return res.status(400).json({ success: false, message: "studentID is required" });
     }
 
     try {
+        // Validate queueId
+        if (!mongoose.Types.ObjectId.isValid(queueId)) {
+            return res.status(400).json({ success: false, message: "Invalid queue ID" });
+        }
+
         const queue = await Queue.findById(queueId);
         if (!queue) {
             return res.status(404).json({ success: false, message: "Queue not found" });
         }
 
-        const newStudent = {
-            studentID,
-            enqueueTime: Date.now()
+        // Fetch the student to get their isAthlete status
+        const student = await Student.findById(studentID);
+        if (!student) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        // Set base priority based on isAthlete status
+        const basePriority = student.isAthlete ? 30 : 0;
+
+        const newStudentInQueue = {
+            studentID: student._id,
+            name: student.name,
+            enqueueTime: Date.now(),
+            isAthlete: student.isAthlete,
+            basePriority: basePriority 
         };
 
-        if (isAthlete) {
-            queue.queueAthletes.push(newStudent);
+        // Add the student to the appropriate queue
+        if (student.isAthlete) {
+            queue.queueAthletes.push(newStudentInQueue);
         } else {
-            queue.queueOrdinaryStudents.push(newStudent);
+            queue.queueOrdinaryStudents.push(newStudentInQueue);
         }
 
         await queue.save();
@@ -193,7 +243,10 @@ export const addStudentToQueue = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Student added to queue successfully",
-            data: queue
+            data: {
+                addedStudent: newStudentInQueue,
+                queueId: queue._id
+            }
         });
 
     } catch (error) {
