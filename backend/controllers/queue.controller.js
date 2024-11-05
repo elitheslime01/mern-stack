@@ -1,6 +1,7 @@
 import Queue from "../models/queue.model.js";
 import Booking from "../models/booking.model.js";
 import Schedule from "../models/schedule.model.js";
+import Student from "../models/student.model.js";
 import mongoose from "mongoose";
 
 export const getQueues = async (req, res) => {
@@ -14,10 +15,10 @@ export const getQueues = async (req, res) => {
 }
 
 export const createQueue = async (req, res) => {
-    const { scheduleID, queueAthletes, queueOrdinaryStudents } = req.body;
+    const { scheduleID } = req.body;
 
-    if (!scheduleID || !queueAthletes || !queueOrdinaryStudents) {
-        return res.status(400).json({ success: false, message: "Please provide scheduleID, queueAthletes, and queueOrdinaryStudents" });
+    if (!scheduleID) {
+        return res.status(400).json({ success: false, message: "Please provide scheduleID" });
     }
 
     // Validate student ID
