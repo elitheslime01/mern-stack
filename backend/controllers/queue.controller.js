@@ -20,11 +20,32 @@ export const createQueue = async (req, res) => {
         return res.status(400).json({ success: false, message: "Please provide scheduleID, queueAthletes, and queueOrdinaryStudents" });
     }
 
-    const newQueue = new Queue({
-        scheduleID,
-        queueAthletes: queueAthletes.map(athlete => ({ studentID: athlete.studentID })),
-        queueOrdinaryStudents: queueOrdinaryStudents.map(student => ({ studentID: student.studentID }))
-    });
+    // Validate student ID
+    if (!mongoose.Types.ObjectId.isValid(studentID)) {
+        return res.status(400).json({ success: false, message: `Invalid student ID: ${studentID}` });
+    }
+
+    // Fetch the student to get their isAthlete status
+    const student = await Student.findById(studentID);
+    if (!student) {
+        return res.status(404).json({ success: false, message: `Student not found for ID: ${studentID}` });
+    }
+
+    // Create a new queue instance
+    const newQueue = new Queue({ scheduleID });
+
+    const newStudentInQueue = {
+        studentID: student._id,
+        name: student.name,
+        isAthlete: student.isAthlete
+    }
+
+    // Add the student to the appropriate queue
+    if (student.isAthlete) {
+        newQueue.queueAthletes.push(newStudentInQueue);
+    } else {
+        newQueue.queueOrdinaryStudents.push(newStudentInQueue);
+    }
 
     try {
         await newQueue.save();

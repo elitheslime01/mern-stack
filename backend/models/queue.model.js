@@ -6,6 +6,14 @@ const studentQueueSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'Student',
+  },
+  name: {
+    type: String,
+    required: true,
+  },
+  isAthlete: {
+    type: Boolean,
+    required: true
   }
 }, {
   timestamps: true  // This adds createdAt and updatedAt for each student entry
