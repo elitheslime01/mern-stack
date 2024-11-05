@@ -15,42 +15,52 @@ export const getQueues = async (req, res) => {
 }
 
 export const createQueue = async (req, res) => {
-    const { scheduleID } = req.body;
+    const { scheduleID, studentID } = req.body;
 
-    if (!scheduleID) {
-        return res.status(400).json({ success: false, message: "Please provide scheduleID" });
-    }
-
-    // Validate student ID
-    if (!mongoose.Types.ObjectId.isValid(studentID)) {
-        return res.status(400).json({ success: false, message: `Invalid student ID: ${studentID}` });
-    }
-
-    // Fetch the student to get their isAthlete status
-    const student = await Student.findById(studentID);
-    if (!student) {
-        return res.status(404).json({ success: false, message: `Student not found for ID: ${studentID}` });
-    }
-
-    // Create a new queue instance
-    const newQueue = new Queue({ scheduleID });
-
-    const newStudentInQueue = {
-        studentID: student._id,
-        name: student.name,
-        isAthlete: student.isAthlete
-    }
-
-    // Add the student to the appropriate queue
-    if (student.isAthlete) {
-        newQueue.queueAthletes.push(newStudentInQueue);
-    } else {
-        newQueue.queueOrdinaryStudents.push(newStudentInQueue);
+    // Check if scheduleID and studentID are provided
+    if (!scheduleID || !studentID) {
+        return res.status(400).json({ success: false, message: "Please provide scheduleID and studentID" });
     }
 
     try {
+        // Validate student ID
+        if (!mongoose.Types.ObjectId.isValid(studentID)) {
+            return res.status(400).json({ success: false, message: `Invalid student ID: ${studentID}` });
+        }
+
+        // Fetch the student to get their isAthlete status
+        const student = await Student.findById(studentID);
+        if (!student) {
+            return res.status(404).json({ success: false, message: `Student not found for ID: ${studentID}` });
+        }
+
+        // Create a new queue instance
+        const newQueue = new Queue({ scheduleID });
+
+        const newStudentInQueue = {
+            studentID: student._id,
+            name: student.name,
+            isAthlete: student.isAthlete
+        }
+
+        // Add the student to the appropriate queue
+        if (student.isAthlete) {
+            newQueue.queueAthletes.push(newStudentInQueue);
+        } else {
+            newQueue.queueOrdinaryStudents.push(newStudentInQueue);
+        }
+
         await newQueue.save();
-        res.status(201).json({ success: true, data: newQueue });
+
+        res.status(200).json({
+            success: true,
+            message: "Student added to queue successfully",
+            data: {
+                addedStudent: newStudentInQueue,
+                queueId: queue._id
+            }
+        });
+        
     } catch (error) {
         console.error("Error in Create Queue: ", error.message);
         res.status(500).json({ success: false, message: "Server Error" });
@@ -160,6 +170,61 @@ export const getQueueForSchedule = async (req, res) => {
     } catch (error) {
         // Log the error and return a 500 response
         console.error("Error in getQueueForSchedule: ", error.message);
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+export const addStudentToQueue = async (req, res) => {
+    const { queueId } = req.params;
+    const { studentID } = req.body;
+
+    if (!studentID) {
+        return res.status(400).json({ success: false, message: "studentID is required" });
+    }
+
+    try {
+        // Validate queueId
+        if (!mongoose.Types.ObjectId.isValid(queueId)) {
+            return res.status(400).json({ success: false, message: "Invalid queue ID" });
+        }
+
+        const queue = await Queue.findById(queueId);
+        if (!queue) {
+            return res.status(404).json({ success: false, message: "Queue not found" });
+        }
+
+        // Fetch the student to get their isAthlete status
+        const student = await Student.findById(studentID);
+        if (!student) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        const newStudentInQueue = {
+            studentID: student._id,
+            name: student.name,
+            isAthlete: student.isAthlete
+        };
+
+        // Add the student to the appropriate queue
+        if (student.isAthlete) {
+            queue.queueAthletes.push(newStudentInQueue);
+        } else {
+            queue.queueOrdinaryStudents.push(newStudentInQueue);
+        }
+
+        await queue.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Student added to queue successfully",
+            data: {
+                addedStudent: newStudentInQueue,
+                queueId: queue._id
+            }
+        });
+
+    } catch (error) {
+        console.error("Error in addStudentToQueue: ", error.message);
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };

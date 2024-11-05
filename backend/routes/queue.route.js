@@ -3,7 +3,8 @@ import {
     createQueue,
     getQueues, 
     getQueueForSchedule, 
-    allocateSlot
+    allocateSlot,
+    addStudentToQueue
 } from "../controllers/queue.controller.js";
 
 const router = express.Router();
@@ -15,7 +16,10 @@ router.get("/", getQueues);
 router.post("/", createQueue);
 
 // Dequeue a student from a specific queue
-router.patch('/:queueId/dequeue', allocateSlot);
+router.patch('/:queueId/allocateSlot', allocateSlot);
+
+// Add student to a specific queue
+router.patch('/:queueId/addStudent', addStudentToQueue);
 
 // Get queue for a specific schedule
 router.get('/schedule/:scheduleID', getQueueForSchedule);
