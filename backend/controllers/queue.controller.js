@@ -70,73 +70,83 @@ export const createQueue = async (req, res) => {
 
 // controllers/queue.controller.js
 export const allocateSlot = async (req, res) => {
-    const { queueId } = req.params;
+    const { queueId } = req.params; // Extract the queue ID from the request parameters
 
     try {
-        // Find queue and schedule
+        // Find the queue by its ID and populate the associated schedule
         const queue = await Queue.findById(queueId).populate('scheduleID');
         if (!queue) {
+            // If the queue is not found, return a 404 error
             return res.status(404).json({ success: false, message: "Queue not found" });
         }
 
+        // Retrieve the schedule associated with the queue
         const schedule = await Schedule.findById(queue.scheduleID._id);
+        // Check if there are available slots in the schedule
         if (schedule.availableSlot <= 0) {
+            // If no slots are available, return a 400 error
             return res.status(400).json({ success: false, message: "No available slots" });
         }
 
-        const dequeuedStudents = [];
+        const dequeuedStudents = []; // Array to hold students who have been dequeued and allocated slots
 
         // Allocate slots based on priority
-        while (schedule.availableSlot > 0) {
-            const prioritizedStudents = queue.getPrioritizedStudents();
-            if (prioritizedStudents.length === 0) break;
+        while (schedule.availableSlot > 0) { // Continue until there are no available slots
+            const prioritizedStudents = queue.getPrioritizedStudents(); // Get the list of students in priority order
+            if (prioritizedStudents.length === 0) break; // If there are no prioritized students, exit the loop
 
-            const student = prioritizedStudents[0];
+            const student = prioritizedStudents[0]; // Select the highest priority student
 
-            // Create booking
+            // Create a new booking for the selected student
             const newBooking = new Booking({
-                studentID: student.studentID,
-                scheduleID: schedule._id,
-                timeIn: "--",
-                timeOut: "--"
+                studentID: student.studentID, // Assign the student's ID to the booking
+                scheduleID: schedule._id, // Assign the schedule ID to the booking
+                timeIn: "--", // Placeholder for time in
+                timeOut: "--" // Placeholder for time out
             });
-            await newBooking.save();
+            await newBooking.save(); // Save the new booking to the database
 
-            // Remove student from appropriate queue
+            // Remove the student from the appropriate queue based on their type
             if (student.isAthlete) {
+                // If the student is an athlete, remove them from the athlete queue
                 queue.queueAthletes = queue.queueAthletes.filter(
-                    s => !s.studentID.equals(student.studentID)
+                    s => !s.studentID.equals(student.studentID) // Filter out the dequeued athlete
                 );
             } else {
+                // If the student is an ordinary student, remove them from the ordinary student queue
                 queue.queueOrdinaryStudents = queue.queueOrdinaryStudents.filter(
-                    s => !s.studentID.equals(student.studentID)
+                    s => !s.studentID.equals(student.studentID) // Filter out the dequeued ordinary student
                 );
             }
 
-            schedule.availableSlot -= 1;
-            dequeuedStudents.push(student);
+            schedule.availableSlot -= 1; // Decrement the number of available slots in the schedule
+            dequeuedStudents.push(student); // Add the dequeued student to the list
         }
 
+        // If no slots are available, update the schedule's availability status
         if (schedule.availableSlot === 0) {
-            schedule.schedAvailability = "Unavailable";
+            schedule.schedAvailability = "Unavailable"; // Mark the schedule as unavailable
         }
 
-        // Save changes
+        // Save the changes made to the queue and schedule
         await queue.save();
         await schedule.save();
 
+        // Respond with a success message and the details of the operation
         res.status(200).json({
             success: true,
             message: "Slots allocated successfully",
             data: {
-                dequeuedStudents,
-                updatedQueue: queue,
-                updatedSchedule: schedule
+                dequeuedStudents, // List of students who were allocated slots
+                updatedQueue: queue, // The updated queue after allocation
+                updatedSchedule: schedule // The updated schedule after allocation
             }
         });
 
     } catch (error) {
+        // Log any errors that occur during the process
         console.error("Error in allocateSlot: ", error.message);
+        // Respond with a server error status
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };

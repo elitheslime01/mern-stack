@@ -42,7 +42,7 @@ const queueSchema = new mongoose.Schema({
 // Calculate priority based on waiting time and student type
 queueSchema.methods.calculatePriority = function(student) {
   const waitingTime = (Date.now() - student.enqueueTime) / 1000 / 60; // Convert to minutes
-  const basePriority = student.isAthlete ? 30 : 0; // Athletes get higher base priority
+  const basePriority = student.isAthlete ? 60 : 0; // Athletes get higher base priority
   return basePriority + waitingTime; // Priority increases with waiting time
 };
 
