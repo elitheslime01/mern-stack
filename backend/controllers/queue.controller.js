@@ -38,7 +38,7 @@ export const createQueue = async (req, res) => {
         const newQueue = new Queue({ scheduleID });
 
         // Set base priority based on isAthlete status
-        const basePriority = student.isAthlete ? 30 : 0;
+        const basePriority = student.isAthlete ? 60 : 0;
 
         const newStudentInQueue = {
             studentID: student._id,
@@ -231,7 +231,7 @@ export const addStudentToQueue = async (req, res) => {
         }
 
         // Set base priority based on isAthlete status
-        const basePriority = student.isAthlete ? 30 : 0;
+        const basePriority = student.isAthlete ? 60 : 0;
 
         const newStudentInQueue = {
             studentID: student._id,
