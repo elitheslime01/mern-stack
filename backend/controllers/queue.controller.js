@@ -64,6 +64,12 @@ export const createQueue = async (req, res) => {
         return res.status(400).json({ success: false, message: "Please provide scheduleID, queueAthletes, and queueOrdinaryStudents" });
     }
 
+    // Check if a queue already exists for the given scheduleID
+    const existingQueue = await Queue.findOne({ scheduleID });
+    if (existingQueue) {
+        return res.status(200).json({ success: true, data: existingQueue, message: "Returning existing queue for this schedule." });
+    }
+
     const newQueue = new Queue({
         scheduleID,
         queueAthletes: queueAthletes.map(athlete => ({ studentID: athlete.studentID })),
@@ -78,28 +84,36 @@ export const createQueue = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
-
 export const allocateSlot = async (req, res) => {
     const { queueId } = req.params;
 
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
-        const queue = await Queue.findById(queueId).populate('scheduleID');
+        const queue = await Queue.findById(queueId)
+            .populate('queueAthletes.studentID', 'name isAthlete unsuccessfulAttempts')
+            .populate('queueOrdinaryStudents.studentID', 'name isAthlete unsuccessfulAttempts')
+            .session(session);
 
         if (!queue) {
             return res.status(404).json({ success: false, message: "Queue not found" });
         }
 
-        const schedule = await Schedule.findById(queue.scheduleID._id);
+        const schedule = await Schedule.findById(queue.scheduleID).session(session);
+        if (!schedule) {
+            throw new Error("Schedule not found.");
+        }
 
         if (schedule.availableSlot <= 0) {
             return res.status(400).json({ success: false, message: "No available slots for this schedule" });
         }
 
-        const maxHeap = new MaxHeap(); // Create a new max-heap
+        const maxHeap = new MaxHeap();
 
         // Insert athletes into the max-heap
         for (const athlete of queue.queueAthletes) {
-            const student = await Student.findById(athlete.studentID);
+            const student = await Student.findById(athlete.studentID).session(session);
             if (student) {
                 maxHeap.insert({ ...student.toObject(), unsuccessfulAttempts: athlete.unsuccessfulAttempts, isAthlete: true });
             } else {
@@ -109,7 +123,7 @@ export const allocateSlot = async (req, res) => {
 
         // Insert ordinary students into the max-heap
         for (const ordinaryStudent of queue.queueOrdinaryStudents) {
-            const student = await Student.findById(ordinaryStudent.studentID);
+            const student = await Student.findById(ordinaryStudent.studentID).session(session);
             if (student) {
                 maxHeap.insert({ ...student.toObject(), unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts, isAthlete: false });
             } else {
@@ -125,10 +139,10 @@ export const allocateSlot = async (req, res) => {
 
             // Create a new booking for the dequeued student
             const newBooking = new Booking({
-                studentID: dequeuedStudent._id, // Set the student ID for the booking
-                scheduleID: schedule._id, // Associate the booking with the schedule
-                timeIn: null, // Placeholder for time in
-                timeOut: null // Placeholder for time out
+                studentID: dequeuedStudent._id,
+                scheduleID: schedule._id,
+                timeIn: new Date().toISOString(), // Set timeIn to current time
+                timeOut: null // This can be set later
             });
 
             // Decrement the available slot in the schedule
@@ -140,19 +154,28 @@ export const allocateSlot = async (req, res) => {
             }
 
             // Save the new booking
-            await newBooking.save();
+            await newBooking.save({ session });
             dequeuedStudents.push(dequeuedStudent); // Add dequeued student to the array
+
+            // Reset unsuccessful attempts to 0 for the student who secured a slot
+            await Student.updateOne(
+                { _id: dequeuedStudent._id },
+                { $set: { unsuccessfulAttempts: 0 } },
+                { session }
+            );
 
             // Increment the unsuccessful attempts for the dequeued student
             if (dequeuedStudent.isAthlete) {
                 await Queue.updateOne(
                     { _id: queueId, "queueAthletes.studentID": dequeuedStudent._id },
-                    { $inc: { "queueAthletes.$.unsuccessfulAttempts": 1 } }
+                    { $inc: { "queueAthletes.$.unsuccessfulAttempts": 1 } },
+                    { session }
                 );
             } else {
                 await Queue.updateOne(
                     { _id: queueId, "queueOrdinaryStudents.studentID": dequeuedStudent._id },
-                    { $inc: { "queueOrdinaryStudents.$.unsuccessfulAttempts": 1 } }
+                    { $inc: { "queueOrdinaryStudents.$.unsuccessfulAttempts": 1 } },
+                    { session }
                 );
             }
         }
@@ -163,22 +186,38 @@ export const allocateSlot = async (req, res) => {
         }
 
         // Save the updated queue and updated schedule to the database
-        await queue.save();
-        await schedule.save();
+        await queue.save({ session });
+        await schedule.save({ session });
+
+        // Commit the transaction
+        await session.commitTransaction();
 
         // Send a successful response with the dequeued students and updated data
-        res.status(200).json({ 
-            success: true, 
-            message: "Students dequeued and bookings created successfully", 
-            data: { 
-                dequeuedStudents, // The students that were dequeued
-                updatedQueue: queue, // The updated queue after dequeuing
-                updatedSchedule: schedule // The updated schedule after decrementing the slots
+        res.status(200).json({
+            success: true,
+            message: "Students dequeued and bookings created successfully",
+            data: {
+                dequeuedStudents,
+                updatedQueue: queue,
+                updatedSchedule: schedule
             }
         });
     } catch (error) {
-        console.error("Error in allocateSlot: ", error.message);
-        res.status(500).json({ success: false, message: "Server Error" });
+        await session.abortTransaction();
+        console.error("Error allocating slots:", error.message);
+        res.status(500).json({ success: false, message: error.message || "Internal server error." });
+    } finally {
+        session.endSession();
     }
 };
 
+export const handleNoShow = async (studentId) => {
+    try {
+        await Student.updateOne(
+            { _id: studentId },
+            { $inc: { noShows: 1 } } // Increment no-show count
+        );
+    } catch (error) {
+        console.error("Error updating no-show count: ", error.message);
+    }
+};

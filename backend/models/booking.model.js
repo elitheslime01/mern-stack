@@ -14,9 +14,10 @@ const bookingSchema = new mongoose.Schema({
     timeIn: { type: String, required: true },
     timeOut: { type: String, required: true }
 }, {
-    timestamps: true
+    timestamps: true,
+    unique: true // Ensure unique bookings based on studentID and scheduleID
 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 
-export default Booking
+export default Booking;

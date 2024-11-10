@@ -26,12 +26,18 @@ class MaxHeap {
     }
 
     compare(studentA, studentB) {
-        // Prioritize athletes over ordinary students
-        if (studentA.isAthlete && !studentB.isAthlete) return 1;
-        if (!studentA.isAthlete && studentB.isAthlete) return -1;
-        
-        // If both are of the same type, prioritize by unsuccessful attempts
-        return studentB.unsuccessfulAttempts - studentA.unsuccessfulAttempts; // Max-heap
+        // Calculate the priority score for student A
+        let scoreA = studentA.isAthlete ? 10 : 0; // Student-Athlete gets +10
+        scoreA += studentA.unsuccessfulAttempts; // Add unsuccessful attempts
+        scoreA -= studentA.noShows ? 2 * studentA.noShows : 0; // Subtract for no-shows
+    
+        // Calculate the priority score for student B
+        let scoreB = studentB.isAthlete ? 10 : 0; // Student-Athlete gets +10
+        scoreB += studentB.unsuccessfulAttempts; // Add unsuccessful attempts
+        scoreB -= studentB.noShows ? 2 * studentB.noShows : 0; // Subtract for no-shows
+    
+        // Compare the scores
+        return scoreB - scoreA; // Max-heap, so higher score means higher priority
     }
 
     extractMax() {

@@ -8,11 +8,15 @@ const studentSchema = new mongoose.Schema({
     isAthlete: {
         type: Boolean,
         required: true,
-        default: false, // Default value can be set based on your application logic
+        default: false,
     },
     unsuccessfulAttempts: {
         type: Number,
-        default: 0 // Initialize unsuccessful attempts to 0
+        default: 0,
+    },
+    noShows: {
+        type: Number,
+        default: 0, 
     }
 }, {
     timestamps: true,

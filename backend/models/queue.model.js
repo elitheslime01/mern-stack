@@ -16,12 +16,13 @@ const queueSchema = new mongoose.Schema({
   scheduleID: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    ref: 'Schedule'
+    ref: 'Schedule',
+    unique: true // Ensure only one queue per schedule
   },
-  queueAthletes: [studentQueueSchema],  // Use the sub-schema for athletes
-  queueOrdinaryStudents: [studentQueueSchema]  // Use the sub-schema for ordinary students
+  queueAthletes: [studentQueueSchema],
+  queueOrdinaryStudents: [studentQueueSchema]
 }, {
-  timestamps: true  // This adds createdAt and updatedAt for the overall queue document
+  timestamps: true
 });
 
 // Create the Queue model
