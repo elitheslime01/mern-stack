@@ -3,17 +3,23 @@ import mongoose from "mongoose";
 const studentSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: true
+        required: true,
     },
     isAthlete: {
         type: Boolean,
         required: true,
-        default: false
+        default: false, // Default value can be set based on your application logic
+    },
+    unsuccessfulAttempts: {
+        type: Number,
+        default: 0 // Initialize unsuccessful attempts to 0
     }
 }, {
-    timestamps: true
-})
+    timestamps: true,
+});
 
-const Student = mongoose.model("Student", studentSchema)
+// Create the Student model
+const Student = mongoose.model('Student', studentSchema);
 
-export default Student
+// Export the Student model
+export default Student;
