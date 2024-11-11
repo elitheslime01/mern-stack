@@ -26,18 +26,15 @@ class MaxHeap {
     }
 
     compare(studentA, studentB) {
-        // Calculate the priority score for student A
-        let scoreA = studentA.isAthlete ? 10 : 0; // Student-Athlete gets +10
-        scoreA += studentA.unsuccessfulAttempts; // Add unsuccessful attempts
-        scoreA -= studentA.noShows ? 2 * studentA.noShows : 0; // Subtract for no-shows
-    
-        // Calculate the priority score for student B
-        let scoreB = studentB.isAthlete ? 10 : 0; // Student-Athlete gets +10
-        scoreB += studentB.unsuccessfulAttempts; // Add unsuccessful attempts
-        scoreB -= studentB.noShows ? 2 * studentB.noShows : 0; // Subtract for no-shows
-    
-        // Compare the scores
-        return scoreB - scoreA; // Max-heap, so higher score means higher priority
+        let scoreA = studentA.isAthlete ? 10 : 0;
+        scoreA += studentA.unsuccessfulAttempts;
+        scoreA -= studentA.noShows ? 2 * studentA.noShows : 0;
+
+        let scoreB = studentB.isAthlete ? 10 : 0;
+        scoreB += studentB.unsuccessfulAttempts;
+        scoreB -= studentB.noShows ? 2 * studentB.noShows : 0;
+
+        return scoreB - scoreA;
     }
 
     extractMax() {
@@ -90,6 +87,7 @@ class MaxHeap {
     isEmpty() {
         return this.heap.length === 0;
     }
+
 }
 
 export default MaxHeap;

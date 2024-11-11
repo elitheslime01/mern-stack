@@ -13,10 +13,6 @@ export const getBookings = async (req, res) => {
     }
 }
 
-import mongoose from "mongoose";
-import Booking from "../models/booking.model.js";
-import Schedule from "../models/schedule.model.js";
-
 export const createBooking = async (req, res) => {
     const { studentID, scheduleID, timeIn, timeOut } = req.body;
 
