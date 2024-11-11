@@ -14,7 +14,8 @@ class BSTPriorityQueue {
     }
 
     // Insert a new value with a given priority
-    insert(value, priority) {
+    insert(value) {
+        const priority = this.computePriority(value);
         const newNode = new Node(value, priority);
         if (!this.root) {
             this.root = newNode;
@@ -38,6 +39,14 @@ class BSTPriorityQueue {
                 this._insertNode(node.right, newNode);
             }
         }
+    }
+
+    // Compute priority based on the same logic as MaxHeap
+    computePriority(student) {
+        let score = student.isAthlete ? 10 : 0;
+        score += student.unsuccessfulAttempts;
+        score -= student.noShows ? 2 * student.noShows : 0;
+        return score;
     }
 
     // Extract the highest priority element (the node with the lowest priority value)
@@ -66,4 +75,4 @@ class BSTPriorityQueue {
     }
 }
 
-export default BSTPriorityQueue
+export default BSTPriorityQueue;
