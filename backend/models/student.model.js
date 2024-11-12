@@ -17,6 +17,10 @@ const studentSchema = new mongoose.Schema({
     noShows: {
         type: Number,
         default: 0, 
+    },
+    attendedSlots: {
+        type: Number,
+        default: 0, 
     }
 }, {
     timestamps: true,

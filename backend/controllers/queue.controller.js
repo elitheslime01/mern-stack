@@ -91,6 +91,8 @@ export const createQueue = async (req, res) => {
 
 // Allocate slots for students in the queue
 export const allocateSlot = async (req, res) => {
+    const start = performance.now(); // Start timing the allocation
+
     const { queueId } = req.params;
 
     const session = await mongoose.startSession();
@@ -98,8 +100,8 @@ export const allocateSlot = async (req, res) => {
 
     try {
         const queue = await Queue.findById(queueId)
-            .populate('queueAthletes.studentID', 'name isAthlete unsuccessfulAttempts')
-            .populate('queueOrdinaryStudents.studentID', 'name isAthlete unsuccessfulAttempts')
+            .populate('queueAthletes.studentID', 'name isAthlete unsuccessfulAttempts attendedSlots noShows') // Include attendedSlots and noShows
+            .populate('queueOrdinaryStudents.studentID', 'name isAthlete unsuccessfulAttempts attendedSlots noShows') // Include attendedSlots and noShows
             .session(session);
 
         if (!queue) {
@@ -121,7 +123,7 @@ export const allocateSlot = async (req, res) => {
         for (const athlete of queue.queueAthletes) {
             const student = await Student.findById(athlete.studentID).session(session);
             if (student) {
-                bstPriorityQueue.insert({ ...student.toObject(), unsuccessfulAttempts: athlete.unsuccessfulAttempts, isAthlete: true });
+                bstPriorityQueue.insert({ ...student.toObject(), unsuccessfulAttempts: athlete.unsuccessfulAttempts, attendedSlots: student.attendedSlots, isAthlete: true });
             } else {
                 console.warn(`Student with ID ${athlete.studentID} not found.`);
             }
@@ -131,7 +133,7 @@ export const allocateSlot = async (req, res) => {
         for (const ordinaryStudent of queue.queueOrdinaryStudents) {
             const student = await Student.findById(ordinaryStudent.studentID).session(session);
             if (student) {
-                bstPriorityQueue.insert({ ...student.toObject(), unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts, isAthlete: false });
+                bstPriorityQueue.insert({ ...student.toObject(), unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts, attendedSlots: student.attendedSlots, isAthlete: false });
             } else {
                 console.warn(`Student with ID ${ordinaryStudent.studentID} not found.`);
             }
@@ -142,13 +144,18 @@ export const allocateSlot = async (req, res) => {
         // Dequeue students until no available slots or no students left
         while (schedule.availableSlot > 0 && !bstPriorityQueue.isEmpty()) {
             const dequeuedStudent = bstPriorityQueue.extractMax(); // Get the student with the highest priority
-            
+
+            // Calculate wait time based on cycleJoined and cycleAllocated
+            const cycleAllocated = new Date();
+            const waitTime = (cycleAllocated - dequeuedStudent.cycleJoined) / 1000; // Convert to seconds
+            console.log(`Wait Time for ${dequeuedStudent.name}: ${waitTime.toFixed(2)} seconds`);
+
             // Create a new booking for the dequeued student
             const newBooking = new Booking({
                 studentID: dequeuedStudent._id,
                 scheduleID: schedule._id,
-                timeIn: new Date().toISOString(), // Set timeIn to current time
-                timeOut: null // This can be set later
+                timeIn: "--",
+                timeOut: "--" // This can be set later
             });
 
             // Decrement the available slot in the schedule
@@ -169,18 +176,71 @@ export const allocateSlot = async (req, res) => {
                 { $set: { unsuccessfulAttempts: 0 } },
                 { session }
             );
+
+            // Check if the student can reset their noShows count
+            if (dequeuedStudent.attendedSlots >= 2) { // Assuming the threshold is 2
+                await Student.updateOne(
+                    { _id: dequeuedStudent._id },
+                    { $set: { noShows: 0 } }, // Reset noShows count
+                    { session }
+                );
+            }
+
+            // Increment the attended slots count
+            await Student.updateOne(
+                { _id: dequeuedStudent._id },
+                { $inc: { attendedSlots: 1 } }, // Increment attended slots
+                { session }
+            );
+
+            // Increment the unsuccessful attempts for the dequeued student
+            if (dequeuedStudent.isAthlete) {
+                await Queue.updateOne(
+                    { _id: queueId, "queueAthletes.studentID": dequeuedStudent._id },
+                    { $inc: { "queueAthletes.$.unsuccess fulAttempts": 1 } },
+                    { session }
+                );
+            } else {
+                await Queue.updateOne(
+                    { _id: queueId, "queueOrdinaryStudents.studentID": dequeuedStudent._id },
+                    { $inc: { "queueOrdinaryStudents.$.unsuccessfulAttempts": 1 } },
+                    { session }
+                );
+            }
         }
+
+        // If no students were dequeued, return a specific message
+        if (dequeuedStudents.length === 0) {
+            return res.status(200).json({ success: true, message: "No students were available to dequeue." });
+        }
+
+        // Save the updated queue and updated schedule to the database
+        await queue.save({ session });
+        await schedule.save({ session });
 
         // Commit the transaction
         await session.commitTransaction();
-        session.endSession();
 
-        return res.status(200).json({ success: true, message: "Slots allocated successfully", students: dequeuedStudents });
+        // Calculate total allocation time
+        const end = performance.now();
+        console.log(`Total Allocation Time: ${(end - start).toFixed(4)} ms`);
+
+        // Send a successful response with the dequeued students and updated data
+        res.status(200).json({
+            success: true,
+            message: "Students dequeued and bookings created successfully",
+            data: {
+                dequeuedStudents,
+                updatedQueue: queue,
+                updatedSchedule: schedule
+            }
+        });
     } catch (error) {
         await session.abortTransaction();
+        console.error("Error allocating slots:", error.message);
+        res.status(500).json({ success: false, message: error.message || "Internal server error." });
+    } finally {
         session.endSession();
-        console.error(error);
-        return res.status(500).json({ success: false, message: "An error occurred while allocating slots" });
     }
 };
 

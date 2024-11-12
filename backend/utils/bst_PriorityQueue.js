@@ -15,6 +15,8 @@ class BSTPriorityQueue {
 
     // Insert a new value with a given priority
     insert(value) {
+        const start = performance.now();
+
         const priority = this.computePriority(value);
         const newNode = new Node(value, priority);
         if (!this.root) {
@@ -22,10 +24,14 @@ class BSTPriorityQueue {
         } else {
             this._insertNode(this.root, newNode);
         }
+
+        const end = performance.now(); // End timing
+        console.log(`Insertion Time: ${(end - start).toFixed(4)} ms`);
     }
 
     // Helper method to insert a node in the BST
     _insertNode(node, newNode) {
+        
         if (newNode.priority < node.priority) {
             if (!node.left) {
                 node.left = newNode;
@@ -51,10 +57,17 @@ class BSTPriorityQueue {
 
     // Extract the highest priority element (the node with the lowest priority value)
     extractMax() {
+        const start = performance.now(); // Start timing
+
+
         if (!this.root) {
             return null; // Queue is empty
         }
         const maxNode = this._extractMaxNode(this.root);
+
+        const end = performance.now(); // End timing
+        console.log(`Extraction Time: ${(end - start).toFixed(4)} ms`);
+        
         return maxNode.value; // Return the value of the extracted node
     }
 
