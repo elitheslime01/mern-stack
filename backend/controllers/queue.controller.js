@@ -92,8 +92,8 @@ export const allocateSlot = async (req, res) => {
 
     try {
         const queue = await Queue.findById(queueId)
-            .populate('queueAthletes.studentID', 'name isAthlete unsuccessfulAttempts')
-            .populate('queueOrdinaryStudents.studentID', 'name isAthlete unsuccessfulAttempts')
+            .populate('queueAthletes.studentID', 'name isAthlete unsuccessfulAttempts attendedSlots noShows')
+            .populate('queueOrdinaryStudents.studentID', 'name isAthlete unsuccessfulAttempts attendedSlots noShows')
             .session(session);
 
         if (!queue) {
@@ -115,7 +115,7 @@ export const allocateSlot = async (req, res) => {
         for (const athlete of queue.queueAthletes) {
             const student = await Student.findById(athlete.studentID).session(session);
             if (student) {
-                maxHeap.insert({ ...student.toObject(), unsuccessfulAttempts: athlete.unsuccessfulAttempts, isAthlete: true });
+                maxHeap.insert({ ...student.toObject(), unsuccessfulAttempts: athlete.unsuccessfulAttempts, attendedSlots: student.attendedSlots, isAthlete: true });
             } else {
                 console.warn(`Student with ID ${athlete.studentID} not found.`);
             }
@@ -125,7 +125,7 @@ export const allocateSlot = async (req, res) => {
         for (const ordinaryStudent of queue.queueOrdinaryStudents) {
             const student = await Student.findById(ordinaryStudent.studentID).session(session);
             if (student) {
-                maxHeap.insert({ ...student.toObject(), unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts, isAthlete: false });
+                maxHeap.insert({ ...student.toObject(), unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts, attendedSlots: student.attendedSlots, isAthlete: false });
             } else {
                 console.warn(`Student with ID ${ordinaryStudent.studentID} not found.`);
             }
@@ -164,11 +164,27 @@ export const allocateSlot = async (req, res) => {
                 { session }
             );
 
+            // Check if the student can reset their noShows count
+            if (dequeuedStudent.attendedSlots >= 2) { // Assuming the threshold is 2
+                await Student.updateOne(
+                    { _id: dequeuedStudent._id },
+                    { $set: { noShows: 0 } }, // Reset noShows count
+                    { session }
+                );
+            }
+
+            // Increment the attended slots count
+            await Student.updateOne(
+                { _id: dequeuedStudent._id },
+                { $inc: { attendedSlots: 1 } }, // Increment attended slots
+                { session }
+            );
+
             // Increment the unsuccessful attempts for the dequeued student
             if (dequeuedStudent.isAthlete) {
                 await Queue.updateOne(
                     { _id: queueId, "queueAthletes.studentID": dequeuedStudent._id },
-                    { $inc: { "queueAthletes.$.unsuccessfulAttempts": 1 } },
+                    { $inc: { "queueAthletes.$. unsuccessfulAttempts": 1 } },
                     { session }
                 );
             } else {
