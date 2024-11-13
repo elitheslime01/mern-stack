@@ -49,7 +49,7 @@ class BSTPriorityQueue {
 
     // Compute priority based on the same logic as MaxHeap
     computePriority(student) {
-        let score = student.isAthlete ? 10 : 0;
+        let score = student.isAthlete ? 20 : 0;
         score += student.unsuccessfulAttempts;
         score -= student.noShows ? 2 * student.noShows : 0;
         return score;

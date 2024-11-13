@@ -146,9 +146,9 @@ export const allocateSlot = async (req, res) => {
             const dequeuedStudent = bstPriorityQueue.extractMax(); // Get the student with the highest priority
 
             // Calculate wait time based on cycleJoined and cycleAllocated
-            const cycleAllocated = new Date();
-            const waitTime = (cycleAllocated - dequeuedStudent.cycleJoined) / 1000; // Convert to seconds
-            console.log(`Wait Time for ${dequeuedStudent.name}: ${waitTime.toFixed(2)} seconds`);
+            const cycleAllocated = performance.now();
+            const waitTime = cycleAllocated - start;
+            console.log(`Wait Time for ${dequeuedStudent.name}: ${waitTime.toFixed(2)} mili-seconds`);
 
             // Create a new booking for the dequeued student
             const newBooking = new Booking({
@@ -236,6 +236,12 @@ export const allocateSlot = async (req, res) => {
             }
         });
     } catch (error) {
+        if (error.code === 112) { // Write conflict error code
+            console.log('Write conflict detected. Retrying...');
+            await allocateSlot(req, res);
+        } else {
+        throw error;
+        }
         await session.abortTransaction();
         console.error("Error allocating slots:", error.message);
         res.status(500).json({ success: false, message: error.message || "Internal server error." });

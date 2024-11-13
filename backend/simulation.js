@@ -23,19 +23,22 @@ const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) +
 // Initialize Students
 const initializeStudents = async () => {
     const students = [];
-    for (let i = 1; i <= 100; i++) { // Creating 100 students for better simulation
+    
+    for (let i = 1; i <= 100; i++) {
+        const isAthlete = i % 3 === 0;
         students.push({
-            name: `Student_${i}`,
-            isAthlete: i % 3 === 0, // Every 3rd student is an athlete
-            // isAthlete: Math.random() < 0.5; // 50% chance of being an athlete
+            name: isAthlete ? `Student_Athlete_${i}` : `Student_Ordinary_${i}`,
+            isAthlete: isAthlete,
             unsuccessfulAttempts: getRandomInt(0, 3),
             noShows: getRandomInt(0, 2),
             attendedSlots: getRandomInt(0, 5),
         });
     }
+
     await Student.insertMany(students);
     console.log('Initialized Students');
 };
+
 
 // Initialize Schedules
 const initializeSchedules = async () => {
@@ -69,19 +72,18 @@ const simulateBookingRequests = async () => {
             setTimeout(async () => {
                 try {
                     const queue = await Queue.findOne({ scheduleID: schedule._id });
-                    const cycleJoined = new Date();
 
                     if (student.isAthlete) {
                         queue.queueAthletes.push({
                             studentID: student._id,
                             unsuccessfulAttempts: student.unsuccessfulAttempts,
-                            cycleJoined, // Add timestamp when joining queue
+                            cycleJoined: performance.now(), // Use performance.now() instead of new Date()
                         });
                     } else {
                         queue.queueOrdinaryStudents.push({
                             studentID: student._id,
                             unsuccessfulAttempts: student.unsuccessfulAttempts,
-                            cycleJoined, // Add timestamp
+                            cycleJoined: performance.now(), // Use performance.now() instead of new Date()
                         });
                     }
 
@@ -104,8 +106,16 @@ const performAllocation = async () => {
         console.log(`Allocating slots for schedule: ${queue.scheduleID.schedTime}`);
         await allocateSlot({ params: { queueId: queue._id.toString() } }, {
             status: (code) => ({
-                json: (data) => {
+                json: async (data) => {
                     console.log(`Allocation Status for ${queue.scheduleID.schedTime}:`, data.message);
+                    // Update the cycleJoined field to the current date and time
+                    const student = await Student.findById(data.studentID);
+                    if (student) {
+                        student.cycleJoined = new Date();
+                        await student.save();
+                    } else {
+                        console.error(`Student not found with ID ${data.studentID}`);
+                    }
                 }
             })
         });
@@ -141,7 +151,7 @@ const verifyResults = async () => {
 // Main Simulation Function
 const runSimulation = async () => {
     try {
-        await mongoose.connect(MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+        await mongoose.connect(MONGO_URI);
         console.log('Connected to MongoDB');
 
         // Optional: Clear existing data for a clean simulation
