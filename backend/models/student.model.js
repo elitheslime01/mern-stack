@@ -23,7 +23,7 @@ const studentSchema = new mongoose.Schema({
         default: 0, 
     },
     cycleJoined: {
-        type: Date,
+        type: Number,
         default: 0, 
     }
 }, {

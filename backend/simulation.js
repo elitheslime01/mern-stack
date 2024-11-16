@@ -1,102 +1,102 @@
-// simulate.js
+// simulation.js
 
 import mongoose from 'mongoose';
 import Student from './models/student.model.js';
 import Schedule from './models/schedule.model.js';
 import Queue from './models/queue.model.js';
 import Booking from './models/booking.model.js';
-import { allocateSlot } from './controllers/queue.controller.js'; // Ensure allocateSlot is exported correctly
+import { createStudent, getStudents } from './controllers/student.controller.js'; 
+import { createSchedule, getSchedules } from './controllers/schedule.controller.js'; 
+import { createQueue } from './controllers/queue.controller.js'; 
+import { createBooking } from './controllers/booking.controller.js'; 
+import { addStudentToQueue } from './controllers/queue.controller.js';
+import { allocateSlot } from './controllers/queue.controller.js'; 
+
 
 // Configuration
-const MONGO_URI = "mongodb+srv://admin:admin123@cluster0.w52a1.mongodb.net/gymbooking?retryWrites=true&w=majority&appName=Cluster0"; // Replace with your MongoDB URI
+const MONGO_URI = "mongodb+srv://admin:admin123@cluster0.w52a1.mongodb.net/gymbooking?retryWrites=true&w=majority&appName=Cluster0" ; // Use environment variable for the MongoDB URI
 const SCHEDULE_DATE = '2024-12-01'; // Example schedule date
 const TIME_SLOTS = [
-    { schedDate: SCHEDULE_DATE, schedTime: '8 am - 10 am', availableSlot: 15, schedAvailability: 'Available' },
-    { schedDate: SCHEDULE_DATE, schedTime: '10 am - 12 pm', availableSlot: 15, schedAvailability: 'Available' },
-    { schedDate: SCHEDULE_DATE, schedTime: '12 pm - 2 pm', availableSlot: 15, schedAvailability: 'Available' },
-    { schedDate: SCHEDULE_DATE, schedTime: '2 pm - 4 pm', availableSlot: 15, schedAvailability: 'Available' },
+    { schedDate: SCHEDULE_DATE, schedTime: '8 am - 10 am', availableSlot: 5, schedAvailability: 'Available' },
+    { schedDate: SCHEDULE_DATE, schedTime: '10 am - 12 pm', availableSlot: 5, schedAvailability: 'Available' },
+    { schedDate: SCHEDULE_DATE, schedTime: '12 pm - 2 pm', availableSlot: 5, schedAvailability: 'Available' },
+    { schedDate: SCHEDULE_DATE, schedTime: '2 pm - 4 pm', availableSlot: 5, schedAvailability: 'Available' },
 ];
 
 // Utility function to generate random integers
 const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 // Initialize Students
-const initializeStudents = async () => {
-    const students = [];
-    
-    for (let i = 1; i <= 100; i++) {
-        const isAthlete = i % 3 === 0;
-        students.push({
-            name: isAthlete ? `Student_Athlete_${i}` : `Student_Ordinary_${i}`,
+const initializeStudents = async (numStudents = 30) => {
+    const students = Array.from({ length: numStudents }, (_, i) => {
+        const isAthlete = (i + 1) % 3 === 0;
+        return {
+            name: isAthlete ? `Student_Athlete_${i + 1}` : `Student_Ordinary_${i + 1}`,
             isAthlete: isAthlete,
             unsuccessfulAttempts: getRandomInt(0, 3),
             noShows: getRandomInt(0, 2),
             attendedSlots: getRandomInt(0, 5),
-        });
-    }
+        };
+    });
 
-    await Student.insertMany(students);
+    // Create students using the controller
+    for (const student of students) {
+        await createStudent({ body: student }, { status: () => ({ json: () => {} }) });
+    }
     console.log('Initialized Students');
 };
 
-
 // Initialize Schedules
 const initializeSchedules = async () => {
-    await Schedule.insertMany(TIME_SLOTS);
+    for (const timeSlot of TIME_SLOTS) {
+        await createSchedule({ body: timeSlot }, { status: () => ({ json: () => {} }) });
+    }
     console.log('Initialized Schedules');
 };
 
 // Initialize Queues
 const initializeQueues = async () => {
-    const schedules = await Schedule.find({});
-    for (const schedule of schedules) {
-        const queue = new Queue({
+    const schedules = await getSchedules();
+    const queuePromises = schedules.data.map(schedule => {
+        const queueData = {
             scheduleID: schedule._id,
             queueAthletes: [],
             queueOrdinaryStudents: [],
-        });
-        await queue.save();
-    }
+        };
+        return createQueue({ body: queueData }, { status: () => ({ json: () => {} }) });
+    });
+    await Promise.all(queuePromises);
     console.log('Initialized Queues');
 };
 
 // Simulate Booking Requests
 const simulateBookingRequests = async () => {
-    const students = await Student.find({});
-    const schedules = await Schedule.find({ schedDate: SCHEDULE_DATE });
+    const students = await getStudents();
+    const schedules = await getSchedules();
 
-    for (const schedule of schedules) {
-        const selectedStudents = students.slice(0, 15);
+    for (const schedule of schedules.data) {
+        const selectedStudents = students.data.sort(() => 0.5 - Math.random()).slice(0, 15); // Random selection
         for (const student of selectedStudents) {
             const delay = getRandomInt(100, 1000);
-            setTimeout(async () => {
-                try {
-                    const queue = await Queue.findOne({ scheduleID: schedule._id });
-
-                    if (student.isAthlete) {
-                        queue.queueAthletes.push({
-                            studentID: student._id,
-                            unsuccessfulAttempts: student.unsuccessfulAttempts,
-                            cycleJoined: performance.now(), // Use performance.now() instead of new Date()
-                        });
-                    } else {
-                        queue.queueOrdinaryStudents.push({
-                            studentID: student._id,
-                            unsuccessfulAttempts: student.unsuccessfulAttempts,
-                            cycleJoined: performance.now(), // Use performance.now() instead of new Date()
-                        });
-                    }
-
-                    await queue.save();
-                    console.log(`Student ${student.name} queued for ${schedule.schedTime}`);
-                } catch (error) {
-                    console.error(`Error queuing student ${student.name}:`, error.message);
-                }
-            }, delay);
+            setTimeout(() => queueStudent(schedule, student), delay);
         }
     }
 };
 
+const queueStudent = async (schedule, student) => {
+    try {
+        // Call the addStudentToQueue controller function
+        const response = await addStudentToQueue({ params: { queueId: schedule._id }, body: { studentID: student._id } }, { status: (code) => ({ json: (data) => data }) });
+
+        if (response.success) {
+            console.log(`Student ${student.name} queued for ${schedule.schedTime}`);
+        } else {
+            console.error(`Failed to queue student ${student.name}: ${response.message}`);
+        }
+    } catch (error) {
+        console.error(`Error queuing student ${student.name}:`, error.message);
+    }
+};
 
 // Allocate Slots
 const performAllocation = async () => {
@@ -107,18 +107,25 @@ const performAllocation = async () => {
         await allocateSlot({ params: { queueId: queue._id.toString() } }, {
             status: (code) => ({
                 json: async (data) => {
-                    console.log(`Allocation Status for ${queue.scheduleID.schedTime}:`, data.message);
-                    // Update the cycleJoined field to the current date and time
-                    const student = await Student.findById(data.studentID);
-                    if (student) {
-                        student.cycleJoined = new Date();
-                        await student.save();
+                    if (data.success && data.studentID) {
+                        console.log(`Allocation successful for ${data.studentID}`);
+                        await updateStudentCycleJoined(data.studentID);
                     } else {
-                        console.error(`Student not found with ID ${data.studentID}`);
+                        console.error(`Allocation failed: ${data.message}`);
                     }
                 }
             })
         });
+    }
+};
+
+const updateStudentCycleJoined = async (studentID) => {
+    const student = await Student.findById(studentID);
+    if (student) {
+        student.cycleJoined = new Date();
+        await student.save();
+    } else {
+        console.error(`Student not found with ID ${studentID}`);
     }
 };
 
@@ -154,11 +161,13 @@ const runSimulation = async () => {
         await mongoose.connect(MONGO_URI);
         console.log('Connected to MongoDB');
 
-        // Optional: Clear existing data for a clean simulation
-        await Student.deleteMany({});
-        await Schedule.deleteMany({});
-        await Queue.deleteMany({});
-        await Booking.deleteMany({});
+        // Clear existing data for a clean simulation
+        await Promise.all([
+            Student.deleteMany({}),
+            Schedule.deleteMany({}),
+            Queue.deleteMany({}),
+            Booking.deleteMany({})
+        ]);
 
         await initializeStudents();
         await initializeSchedules();

@@ -2,6 +2,7 @@ import Queue from "../models/queue.model.js";
 import Student from "../models/student.model.js";
 import Schedule from "../models/schedule.model.js";
 import Booking from "../models/booking.model.js";
+import { createBooking } from "../controllers/booking.controller.js"; // Add this line
 import BSTPriorityQueue from "../utils/bst_PriorityQueue.js"; // Ensure this is imported
 import mongoose from "mongoose";
 
@@ -11,11 +12,11 @@ export const getQueues = async (req, res) => {
         const queues = await Queue.find({})
             .populate({
                 path: 'queueAthletes.studentID',
-                select: 'name isAthlete unsuccessfulAttempts' // Select the fields to populate
+                select: 'name isAthlete unsuccessfulAttempts noShows attendedSlots' // Select the fields to populate
             })
             .populate({
                 path: 'queueOrdinaryStudents.studentID',
-                select: 'name isAthlete unsuccessfulAttempts' // Select the fields to populate
+                select: 'name isAthlete unsuccessfulAttempts noShows attendedSlots' // Select the fields to populate
             });
 
         res.status(200).json({ success: true, data: queues });
@@ -39,26 +40,20 @@ export const getQueueForSchedule = async (req, res) => {
         const queue = await Queue.findOne({ scheduleID })
             .populate({
                 path: 'queueAthletes.studentID',
-                select: 'name isAthlete unsuccessfulAttempts' // Select the fields to populate
+                select: 'name isAthlete unsuccessfulAttempts', // Select the fields to populate
+                strictPopulate: false // Add this line to allow populating non-schema fields
             })
             .populate({
                 path: 'queueOrdinaryStudents.studentID',
-                select: 'name isAthlete unsuccessfulAttempts' // Select the fields to populate
+                select: 'name isAthlete unsuccessfulAttempts', // Select the fields to populate
+                strictPopulate: false // Add this line to allow populating non-schema fields
             });
 
-        // If no queue is found, return a 404 response
-        if (!queue) {
-            return res.status(404).json({ success: false, message: "No queue found for this schedule" });
-        }
-
-        // Return the found queue with a 200 status
-        res.status(200).json({ success: true, data: queue });
+        // ... Rest of the function
     } catch (error) {
-        // Log the error and return a 500 response
-        console.error("Error in getQueueForSchedule: ", error.message);
-        res.status(500).json({ success: false, message: "Server Error" });
+        // ... Rest of the error handling
     }
-};
+}
 
 // Create a new queue
 export const createQueue = async (req, res) => {
@@ -123,7 +118,13 @@ export const allocateSlot = async (req, res) => {
         for (const athlete of queue.queueAthletes) {
             const student = await Student.findById(athlete.studentID).session(session);
             if (student) {
-                bstPriorityQueue.insert({ ...student.toObject(), unsuccessfulAttempts: athlete.unsuccessfulAttempts, attendedSlots: student.attendedSlots, isAthlete: true });
+                bstPriorityQueue.insert({
+                    ...student.toObject(),
+                    unsuccessfulAttempts: athlete.unsuccessfulAttempts,
+                    attendedSlots: student.attendedSlots,
+                    noShows: student.noShows,
+                    isAthlete: true
+                });
             } else {
                 console.warn(`Student with ID ${athlete.studentID} not found.`);
             }
@@ -133,7 +134,13 @@ export const allocateSlot = async (req, res) => {
         for (const ordinaryStudent of queue.queueOrdinaryStudents) {
             const student = await Student.findById(ordinaryStudent.studentID).session(session);
             if (student) {
-                bstPriorityQueue.insert({ ...student.toObject(), unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts, attendedSlots: student.attendedSlots, isAthlete: false });
+                bstPriorityQueue.insert({
+                    ...student.toObject(),
+                    unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts,
+                    attendedSlots: student.attendedSlots,
+                    noShows: student.noShows,
+                    isAthlete: false
+                });
             } else {
                 console.warn(`Student with ID ${ordinaryStudent.studentID} not found.`);
             }
@@ -144,19 +151,26 @@ export const allocateSlot = async (req, res) => {
         // Dequeue students until no available slots or no students left
         while (schedule.availableSlot > 0 && !bstPriorityQueue.isEmpty()) {
             const dequeuedStudent = bstPriorityQueue.extractMax(); // Get the student with the highest priority
+            console.log(`Dequeued Student ID: ${dequeuedStudent._id}`); // Log the dequeued student ID
 
-            // Calculate wait time based on cycleJoined and cycleAllocated
-            const cycleAllocated = performance.now();
-            const waitTime = cycleAllocated - start;
-            console.log(`Wait Time for ${dequeuedStudent.name}: ${waitTime.toFixed(2)} mili-seconds`);
-
-            // Create a new booking for the dequeued student
-            const newBooking = new Booking({
-                studentID: dequeuedStudent._id,
+            // Prepare booking data
+            const bookingData = {
                 scheduleID: schedule._id,
-                timeIn: "--",
-                timeOut: "--" // This can be set later
-            });
+                bookedStudents: [{
+                    studentID: dequeuedStudent._id,
+                    timeIn: "--", // Set appropriate time in
+                    timeOut: "--" // Set appropriate time out
+                }]
+            };
+
+            // Call the createBooking function from the booking controller
+            const bookingResponse = await createBooking({ body: bookingData }, { status: (code) => ({ json: (data) => data }) });
+
+            // Check if booking was successful
+            if (!bookingResponse.success) {
+                console.error("Booking creation failed:", bookingResponse.message);
+                continue; // Skip to the next student if booking fails
+            }
 
             // Decrement the available slot in the schedule
             schedule.availableSlot -= 1;
@@ -178,12 +192,18 @@ export const allocateSlot = async (req, res) => {
             );
 
             // Check if the student can reset their noShows count
-            if (dequeuedStudent.attendedSlots >= 2) { // Assuming the threshold is 2
-                await Student.updateOne(
+            if (dequeuedStudent.isAthlete) {
+                const targetAttendedSlots = 3;
+                const attendedSlotsSinceLastReset = dequeuedStudent.attendedSlots - dequeuedStudent.noShows * 2;
+
+                if (attendedSlotsSinceLastReset >= targetAttendedSlots) {
+                    const slotsToReset = Math.floor(attendedSlotsSinceLastReset / targetAttendedSlots);
+                    await Student.updateOne(
                     { _id: dequeuedStudent._id },
-                    { $set: { noShows: 0 } }, // Reset noShows count
+                    { $inc: { attendedSlots: -slotsToReset * targetAttendedSlots, noShows: -slotsToReset } },
                     { session }
                 );
+                }
             }
 
             // Increment the attended slots count
@@ -193,11 +213,11 @@ export const allocateSlot = async (req, res) => {
                 { session }
             );
 
-            // Increment the unsuccessful attempts for the dequeued student
+            // Update unsuccessful attempts for the dequeued student
             if (dequeuedStudent.isAthlete) {
                 await Queue.updateOne(
                     { _id: queueId, "queueAthletes.studentID": dequeuedStudent._id },
-                    { $inc: { "queueAthletes.$.unsuccess fulAttempts": 1 } },
+                    { $inc: { "queueAthletes.$.unsuccessfulAttempts": 1 } },
                     { session }
                 );
             } else {
@@ -207,26 +227,34 @@ export const allocateSlot = async (req, res) => {
                     { session }
                 );
             }
+
+            // Remove the dequeued student from the appropriate queue
+            if (dequeuedStudent.isAthlete) {
+                await Queue.updateOne(
+                    { _id: queueId },
+                    { $pull: { queueAthletes: { studentID: dequeuedStudent._id } } },
+                    { session }
+                );
+            } else {
+                await Queue.updateOne(
+                    { _id: queueId },
+                    { $pull: { queueOrdinaryStudents: { studentID: dequeuedStudent._id } } },
+                    { session }
+                );
+            }
         }
 
-        // If no students were dequeued, return a specific message
-        if (dequeuedStudents.length === 0) {
-            return res.status(200).json({ success: true, message: "No students were available to dequeue." });
-        }
-
-        // Save the updated queue and updated schedule to the database
-        await queue.save({ session });
+        // Save the updated schedule
         await schedule.save({ session });
 
         // Commit the transaction
         await session.commitTransaction();
+        session.endSession();
 
-        // Calculate total allocation time
-        const end = performance.now();
-        console.log(`Total Allocation Time: ${(end - start).toFixed(4)} ms`);
+        const end = performance.now(); // End timing the allocation
+        console.log(`Allocation completed in ${end - start} ms`);
 
-        // Send a successful response with the dequeued students and updated data
-        res.status(200).json({
+        return res.status(200).json({
             success: true,
             message: "Students dequeued and bookings created successfully",
             data: {
@@ -236,18 +264,18 @@ export const allocateSlot = async (req, res) => {
             }
         });
     } catch (error) {
-        if (error.code === 112) { // Write conflict error code
-            console.log('Write conflict detected. Retrying...');
-            await allocateSlot(req, res);
-        } else {
-        throw error;
-        }
         await session.abortTransaction();
-        console.error("Error allocating slots:", error.message);
-        res.status(500).json({ success: false, message: error.message || "Internal server error." });
-    } finally {
         session.endSession();
+        console.error("Error during allocation:", error);
+        return res.status(500).json({ success: false, message: "An error occurred during allocation" });
     }
+};
+
+// Example function to calculate average waiting time
+const calculateAverageWaitingTime = (students) => {
+    if (students.length === 0) return 0;
+    const totalWaitingTime = students.reduce((acc, student) => acc + student.waitingTime, 0); // Assuming waitingTime is tracked
+    return (totalWaitingTime / students.length).toFixed(4); // Average waiting time
 };
 
 // Dequeue a student from the queue
@@ -268,5 +296,58 @@ export const dequeueStudent = async (req, res) => {
     } catch (error) {
         console.error("Error in dequeueStudent: ", error.message);
         res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+
+export const addStudentToQueue = async (req, res) => {
+    const { queueId } = req.params; // Get the queue ID from the request parameters
+    const { studentID } = req.body; // Get the student ID from the request body
+
+    const session = await mongoose.startSession(); // Start a new session
+    session.startTransaction(); // Begin a transaction
+
+    try {
+        // Check if the queue exists
+        const queue = await Queue.findById(queueId).session(session);
+        if (!queue) {
+            return res.status(404).json({ success: false, message: "Queue not found" });
+        }
+
+        // Fetch the student to determine their type (athlete or ordinary)
+        const student = await Student.findById(studentID).session(session);
+        if (!student) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        // Create a new entry for the student in the appropriate queue
+        const queueEntry = {
+            studentID: student._id,
+            unsuccessfulAttempts: student.unsuccessfulAttempts,
+            // Other relevant fields can be added here
+        };
+
+        // Add to the appropriate queue based on student type
+        if (student.isAthlete) {
+            queue.queueAthletes.push(queueEntry);
+        } else {
+            queue.queueOrdinaryStudents.push(queueEntry);
+        }
+
+        // Save the updated queue
+        await queue.save({ session }); // Save within the session
+
+        // Commit the transaction
+        await session.commitTransaction();
+
+        res.status(200).json({ success: true, message: "Student added to queue successfully" });
+    } catch (error) {
+        // Abort the transaction in case of an error
+        await session.abortTransaction();
+        console.error("Error adding student to queue:", error.message);
+        res.status(500).json({ success: false, message: "Server Error" });
+    } finally {
+        // End the session
+        session.endSession();
     }
 };

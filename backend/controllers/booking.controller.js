@@ -1,62 +1,68 @@
 import Booking from "../models/booking.model.js";
 import mongoose from "mongoose";
 
+// Get all bookings
 export const getBookings = async (req, res) => {
     try {
         const bookings = await Booking.find({})
-            .populate('studentID', 'name') // Populate student name
-            .populate('scheduleID', 'schedDate schedTime'); // Populate schedule details
+            .populate({
+                path: 'studentID',
+                select: 'name isAthlete unsuccessfulAttempts',
+                strictPopulate: false, // Add this line to allow populating non-schema fields
+            });
+
         res.status(200).json({ success: true, data: bookings });
     } catch (error) {
         console.log("Error in fetching bookings: ", error.message);
         res.status(500).json({ success: false, message: "Server Error" });
     }
-}
+};
 
 export const createBooking = async (req, res) => {
-    const { studentID, scheduleID, timeIn, timeOut } = req.body;
+    const { scheduleID, bookedStudents } = req.body; // bookedStudents is now an array of objects
 
     // Validate input
-    if (!studentID || !scheduleID || !timeIn || !timeOut) {
-        return res.status(400).json({ success: false, message: "Please fill in all fields" });
+    if (!scheduleID || !bookedStudents || !Array.isArray(bookedStudents) || bookedStudents.length === 0) {
+        return res.status(400).json({ success: false, message: "Please provide a valid scheduleID and an array of booked students" });
     }
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
-
     try {
-        // Check if a booking already exists for the given studentID and scheduleID
-        const existingBooking = await Booking.findOne({ studentID, scheduleID }).session(session);
-        if (existingBooking) {
-            // If a booking exists, return it with a success message
-            return res.status(200).json({ success: true, data: existingBooking, message: "Returning existing booking for this student and schedule." });
+        // Check if a booking already exists for the given scheduleID
+        const addStudentsResult = await addStudentsToExistingBooking(scheduleID, bookedStudents);
+
+        if (addStudentsResult.success) {
+            // If students were added to an existing booking, return the updated booking
+            return res.status(200).json(addStudentsResult);
         }
 
-        // Find the schedule and check available slots
-        const schedule = await Schedule.findById(scheduleID).session(session);
-        if (!schedule || schedule.availableSlot <= 0) {
-            throw new Error("No available slots for this schedule.");
-        }
+        // Create a new booking if no existing booking is found
+        const newBooking = new Booking({ scheduleID, bookedStudents });
+        await newBooking.save();
 
-        // Create a new booking
-        const newBooking = new Booking({ studentID, scheduleID, timeIn, timeOut });
-        await newBooking.save({ session });
-
-        // Update the schedule's available slots
-        schedule.availableSlot -= 1;
-        await schedule.save({ session });
-
-        // Commit the transaction
-        await session.commitTransaction();
         res.status(201).json({ success: true, data: newBooking });
     } catch (error) {
-        // Abort the transaction in case of error
-        await session.abortTransaction();
         console.error("Error creating booking:", error.message);
-        res.status(500).json({ success: false, message: error.message || "Internal server error." });
-    } finally {
-        // End the session
-        session.endSession();
+        res.status(500).json({ success: false, message: "Internal server error." });
+    }
+};
+
+export const addStudentsToExistingBooking = async (scheduleID, bookedStudents) => {
+    try {
+        // Check if a booking already exists for the given scheduleID
+        const existingBooking = await Booking.findOne({ scheduleID });
+
+        if (existingBooking) {
+            // If a booking exists, update it by adding the new students
+            existingBooking.bookedStudents.push(...bookedStudents); // Add new students to the existing booking
+            await existingBooking.save(); // Save the updated booking
+
+            return { success: true, data: existingBooking, message: "Added students to existing booking." };
+        }
+
+        return { success: false, message: "No existing booking found for the given scheduleID." };
+    } catch (error) {
+        console.error("Error adding students to existing booking:", error.message);
+        return { success: false, message: "Internal server error." };
     }
 };
 

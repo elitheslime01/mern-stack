@@ -1,23 +1,33 @@
 import mongoose from "mongoose";
 
-const bookingSchema = new mongoose.Schema({
+const bookedStudentSchema = new mongoose.Schema({
     studentID: {
         type: mongoose.Schema.Types.ObjectId,
-        required: true,
-        ref: 'Student',
+        ref: 'Student', // Reference to the Student model
+        required: true
     },
+    timeIn: {
+        type: String, // You can also use Date if you prefer to store as a date
+        required: true
+    },
+    timeOut: {
+        type: String, // You can also use Date if you prefer to store as a date
+        required: true
+    }
+}, { _id: false }); // Disable automatic ID generation for this sub-document
+
+const bookingSchema = new mongoose.Schema({
     scheduleID: {
         type: mongoose.Schema.Types.ObjectId,
         required: true,
-        ref: 'Schedule',
+        ref: 'Schedule' // Reference to the Schedule model
     },
-    timeIn: { type: String, required: true },
-    timeOut: { type: String, required: true }
+    bookedStudents: [bookedStudentSchema] // Use the sub-document schema here
 }, {
-    timestamps: true,
-    unique: true // Ensure unique bookings based on studentID and scheduleID
+    timestamps: true // Automatically manage createdAt and updatedAt fields
 });
 
+// Create the Booking model
 const Booking = mongoose.model('Booking', bookingSchema);
 
 export default Booking;
