@@ -162,16 +162,11 @@ export const allocateSlot = async (req, res) => {
                     timeOut: "--" // Set appropriate time out
                 }]
             };
+            // Create a new booking instance
+            const newBooking = new Booking(bookingData);
 
             // Call the createBooking function from the booking controller
             const bookingResponse = await createBooking({ body: bookingData }, { status: (code) => ({ json: (data) => data }) });
-
-            // Check if booking was successful
-            if (!bookingResponse.success) {
-                console.error("Booking creation failed:", bookingResponse.message);
-                continue; // Skip to the next student if booking fails
-            }
-
             // Decrement the available slot in the schedule
             schedule.availableSlot -= 1;
 
