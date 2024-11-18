@@ -27,6 +27,9 @@ class BSTPriorityQueue {
 
         const end = performance.now(); // End timing
         console.log(`Insertion Time: ${(end - start).toFixed(4)} ms`);
+
+        // Log memory usage after insertion
+        this.logMemoryUsage('After Insertion');
     }
 
     // Helper method to insert a node in the BST
@@ -68,6 +71,9 @@ class BSTPriorityQueue {
         const end = performance.now(); // End timing
         console.log(`Extraction Time: ${(end - start).toFixed(4)} ms`);
         
+        // Log memory usage after extraction
+        this.logMemoryUsage('After Extraction');
+
         return maxNode.value; // Return the value of the extracted node
     }
 
@@ -80,6 +86,16 @@ class BSTPriorityQueue {
         }
         node.left = this._extractMaxNode(node.left);
         return node;
+    }
+
+    // Log memory usage
+    logMemoryUsage(message) {
+        const memoryUsage = process.memoryUsage();
+        console.log(`${message}:`);
+        console.log(`  RSS: ${memoryUsage.rss} bytes`);
+        console.log(`  Heap Total: ${memoryUsage.heapTotal} bytes`);
+        console.log(`  Heap Used: ${memoryUsage.heapUsed} bytes`);
+        console.log(`  External: ${memoryUsage.external} bytes`);
     }
 
     // Check if the queue is empty

@@ -19,30 +19,20 @@ export const getBookings = async (req, res) => {
 };
 
 export const createBooking = async (req, res) => {
-    const { scheduleID, bookedStudents } = req.body; // bookedStudents is now an array of objects
+    const { scheduleID, bookedStudents } = req.body;
 
-    // Validate input
     if (!scheduleID || !bookedStudents || !Array.isArray(bookedStudents) || bookedStudents.length === 0) {
         return res.status(400).json({ success: false, message: "Please provide a valid scheduleID and an array of booked students" });
     }
 
     try {
-        // Check if a booking already exists for the given scheduleID
-        const addStudentsResult = await addStudentsToExistingBooking(scheduleID, bookedStudents);
-
-        if (addStudentsResult.success) {
-            // If students were added to an existing booking, return the updated booking
-            return res.status(200).json(addStudentsResult);
-        }
-
-        // Create a new booking if no existing booking is found
         const newBooking = new Booking({ scheduleID, bookedStudents });
-        await newBooking.save();
+        await newBooking.save(); // Make sure to save the new booking
 
-        res.status(201).json({ success: true, data: newBooking });
+        return { success: true, data: newBooking }; // Return the new booking object
     } catch (error) {
         console.error("Error creating booking:", error.message);
-        res.status(500).json({ success: false, message: "Internal server error." });
+        return { success: false, message: "Internal server error." }; // Return an error response
     }
 };
 

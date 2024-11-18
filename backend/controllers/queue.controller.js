@@ -162,21 +162,28 @@ export const allocateSlot = async (req, res) => {
                     timeOut: "--" // Set appropriate time out
                 }]
             };
-            // Create a new booking instance
-            const newBooking = new Booking(bookingData);
+            // Check if a booking already exists for this schedule
+            const existingBooking = await Booking.findOne({ scheduleID: schedule._id }).session(session);
 
-            // Call the createBooking function from the booking controller
-            const bookingResponse = await createBooking({ body: bookingData }, { status: (code) => ({ json: (data) => data }) });
-            // Decrement the available slot in the schedule
-            schedule.availableSlot -= 1;
+            if (existingBooking) {
+                // If a booking exists, add the student to the existing booking
+                const addStudentResponse = await addStudentsToExistingBooking(schedule._id, bookingData.bookedStudents);
 
-            // If availableSlot reaches 0, update the schedule's availability status
-            if (schedule.availableSlot === 0) {
-                schedule.schedAvailability = "Unavailable"; // Mark the schedule as unavailable
+                if (!addStudentResponse.success) {
+                    throw new Error(addStudentResponse.message); // Handle error if adding students failed
+                }
+            } else {
+                // If no existing booking, create a new one
+                const bookingResponse = await createBooking({ body: bookingData }, { status: (code) => ({ json: (data) => data }) });
+
+                if (!bookingResponse.success) {
+                    throw new Error(bookingResponse.message); // Handle error if booking creation failed
+                }
             }
 
-            // Save the new booking
-            await newBooking.save({ session });
+            // Continue with the allocation logic
+            schedule.availableSlot -= 1;
+            // ... (rest of your allocation logic)
             dequeuedStudents.push(dequeuedStudent); // Add dequeued student to the array
 
             // Reset unsuccessful attempts to 0 for the student who secured a slot
