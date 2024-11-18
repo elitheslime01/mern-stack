@@ -151,7 +151,7 @@ export const allocateSlot = async (req, res) => {
         // Dequeue students until no available slots or no students left
         while (schedule.availableSlot > 0 && !bstPriorityQueue.isEmpty()) {
             const dequeuedStudent = bstPriorityQueue.extractMax(); // Get the student with the highest priority
-            console.log(`Dequeued Student ID: ${dequeuedStudent._id}`); // Log the dequeued student ID
+            //console.log(`Dequeued Student ID: ${dequeuedStudent._id}`); // Log the dequeued student ID
 
             // Prepare booking data
             const bookingData = {
@@ -183,6 +183,12 @@ export const allocateSlot = async (req, res) => {
 
             // Continue with the allocation logic
             schedule.availableSlot -= 1;
+            
+            // If availableSlot reaches 0, update the schedule's availability status
+            if (schedule.availableSlot === 0) {
+                schedule.schedAvailability = "Unavailable"; // Mark the schedule as unavailable
+            }
+
             // ... (rest of your allocation logic)
             dequeuedStudents.push(dequeuedStudent); // Add dequeued student to the array
 
@@ -193,20 +199,20 @@ export const allocateSlot = async (req, res) => {
                 { session }
             );
 
-            // Check if the student can reset their noShows count
-            if (dequeuedStudent.isAthlete) {
-                const targetAttendedSlots = 3;
-                const attendedSlotsSinceLastReset = dequeuedStudent.attendedSlots - dequeuedStudent.noShows * 2;
+            // // Check if the student can reset their noShows count
+            // if (dequeuedStudent.isAthlete) {
+            //     const targetAttendedSlots = 3;
+            //     const attendedSlotsSinceLastReset = dequeuedStudent.attendedSlots - dequeuedStudent.noShows * 2;
 
-                if (attendedSlotsSinceLastReset >= targetAttendedSlots) {
-                    const slotsToReset = Math.floor(attendedSlotsSinceLastReset / targetAttendedSlots);
-                    await Student.updateOne(
-                    { _id: dequeuedStudent._id },
-                    { $inc: { attendedSlots: -slotsToReset * targetAttendedSlots, noShows: -slotsToReset } },
-                    { session }
-                );
-                }
-            }
+            //     if (attendedSlotsSinceLastReset >= targetAttendedSlots) {
+            //         const slotsToReset = Math.floor(attendedSlotsSinceLastReset / targetAttendedSlots);
+            //         await Student.updateOne(
+            //         { _id: dequeuedStudent._id },
+            //         { $inc: { attendedSlots: -slotsToReset * targetAttendedSlots, noShows: -slotsToReset } },
+            //         { session }
+            //     );
+            //     }
+            // }
 
             // Increment the attended slots count
             await Student.updateOne(

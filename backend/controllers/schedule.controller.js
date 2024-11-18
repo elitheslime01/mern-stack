@@ -3,9 +3,7 @@ import mongoose from "mongoose";
 
 export const getSchedules = async (req, res) => {
     try {
-        console.log("Fetching schedules...");
         const schedules = await Schedule.find({});
-        console.log("Schedules fetched:", schedules);
         res.status(200).json({ success: true, data: schedules });
     } catch (error) {
         console.log("error in fetching schedules: ", error.message);

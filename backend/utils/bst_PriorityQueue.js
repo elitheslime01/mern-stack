@@ -15,7 +15,7 @@ class BSTPriorityQueue {
 
     // Insert a new value with a given priority
     insert(value) {
-        const start = performance.now();
+        // const start = performance.now();
 
         const priority = this.computePriority(value);
         const newNode = new Node(value, priority);
@@ -25,8 +25,8 @@ class BSTPriorityQueue {
             this._insertNode(this.root, newNode);
         }
 
-        const end = performance.now(); // End timing
-        console.log(`Insertion Time: ${(end - start).toFixed(4)} ms`);
+        // const end = performance.now(); // End timing
+        // console.log(`Insertion Time: ${(end - start).toFixed(4)} ms`);
 
         // Log memory usage after insertion
         this.logMemoryUsage('After Insertion');
@@ -52,15 +52,25 @@ class BSTPriorityQueue {
 
     // Compute priority based on the same logic as MaxHeap
     computePriority(student) {
-        let score = student.isAthlete ? 5 : 0;
-        score += student.unsuccessfulAttempts;
-        score -= student.noShows ? 2 * student.noShows : 0;
-        return score;
+    let score = student.isAthlete ? 5 : 0; // Base score for being an athlete
+    score += student.unsuccessfulAttempts; // Add unsuccessful attempts to the score
+
+    // Calculate attended slots since the last reset
+    const targetAttendedSlots = 3;
+    const attendedSlotsSinceLastReset = student.attendedSlots - student.noShows * 2;
+
+    // Check if the student can reset their noShows count
+    if (attendedSlotsSinceLastReset >= targetAttendedSlots) {
+        const slotsToReset = Math.floor(attendedSlotsSinceLastReset / targetAttendedSlots);
+        score -= slotsToReset; // Decrease score for each reset opportunity
     }
+
+    return score; // Return the calculated priority score
+}
 
     // Extract the highest priority element (the node with the lowest priority value)
     extractMax() {
-        const start = performance.now(); // Start timing
+        //const start = performance.now(); // Start timing
 
 
         if (!this.root) {
@@ -68,8 +78,8 @@ class BSTPriorityQueue {
         }
         const maxNode = this._extractMaxNode(this.root);
 
-        const end = performance.now(); // End timing
-        console.log(`Extraction Time: ${(end - start).toFixed(4)} ms`);
+        // const end = performance.now(); // End timing
+        // console.log(`Extraction Time: ${(end - start).toFixed(4)} ms`);
         
         // Log memory usage after extraction
         this.logMemoryUsage('After Extraction');

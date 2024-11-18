@@ -27,15 +27,15 @@ const TIME_SLOTS = [
 const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 // Initialize Students
-const initializeStudents = async (numStudents = 30) => {
+const initializeStudents = async (numStudents = 120) => {
     const students = Array.from({ length: numStudents }, (_, i) => {
         const isAthlete = (i + 1) % 3 === 0;
         return {
             name: isAthlete ? `Student_Athlete_${i + 1}` : `Student_Ordinary_${i + 1}`,
             isAthlete: isAthlete,
-            unsuccessfulAttempts: getRandomInt(0, 3),
+            unsuccessfulAttempts: getRandomInt(0, 6),
             noShows: getRandomInt(0, 2),
-            attendedSlots: getRandomInt(0, 5),
+            attendedSlots: getRandomInt(0, 6),
         };
     });
 
