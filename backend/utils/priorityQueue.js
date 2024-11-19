@@ -4,8 +4,14 @@ class MaxHeap {
     }
 
     insert(student) {
+        const start = performance.now(); // Start timing
+
         this.heap.push(student);
         this.bubbleUp();
+
+        const end = performance.now(); // End timing
+        console.log(`Insertion Time: ${(end - start).toFixed(4)} ms`); // Log insertion time
+        //this.logMemoryUsage('After Insertion'); // Log memory usage after insertion
     }
 
     bubbleUp() {
@@ -26,24 +32,25 @@ class MaxHeap {
     }
 
     compare(studentA, studentB) {
-        let scoreA = studentA.isAthlete ? 10 : 0;
-        scoreA += studentA.unsuccessfulAttempts;
-        scoreA -= studentA.noShows ? 2 * studentA.noShows : 0;
-
-        let scoreB = studentB.isAthlete ? 10 : 0;
-        scoreB += studentB.unsuccessfulAttempts;
-        scoreB -= studentB.noShows ? 2 * studentB.noShows : 0;
-
-        return scoreB - scoreA;
+        let scoreA = this.computePriority(studentA);
+        let scoreB = this.computePriority(studentB);
+        return scoreB - scoreA; // Higher scores indicate higher priority
     }
 
     extractMax() {
+        const start = performance.now(); // Start timing
+
         if (this.heap.length === 0) return null;
         if (this.heap.length === 1) return this.heap.pop();
 
         const max = this.heap[0];
         this.heap[0] = this.heap.pop();
         this.bubbleDown();
+
+        const end = performance.now(); // End timing
+        console.log(`Extraction Time: ${(end - start).toFixed(4)} ms`); // Log extraction time
+        //this.logMemoryUsage('After Extraction'); // Log memory usage after extraction
+
         return max;
     }
 
@@ -84,10 +91,35 @@ class MaxHeap {
         this.heap[index] = element;
     }
 
+    computePriority(student) {
+        let score = student.isAthlete ? 5 : 0; // Base score for being an athlete
+        score += student.unsuccessfulAttempts; // Add unsuccessful attempts to the score
+
+        // Calculate attended slots since the last reset
+        const targetAttendedSlots = 3;
+        const attendedSlotsSinceLastReset = student.attendedSlots - student.noShows * 2;
+
+        // Check if the student can reset their noShows count
+        if (attendedSlotsSinceLastReset >= targetAttendedSlots) {
+            const slotsToReset = Math.floor(attendedSlotsSinceLastReset / targetAttendedSlots);
+            score -= slotsToReset; // Decrease score for each reset opportunity
+        }
+
+        return score; // Return the calculated priority score
+    }
+
+    // logMemoryUsage(message) {
+    //     const memoryUsage = process.memoryUsage();
+    //     console.log(`${message}:`);
+    //     console.log(`  RSS: ${memoryUsage.rss} bytes`);
+    //     console.log(`  Heap Total: ${memoryUsage.heapTotal} bytes`);
+    //     console.log(`  Heap Used: ${memoryUsage.heapUsed} bytes`);
+    //     console.log(`  External: ${memoryUsage.external} bytes`);
+    // }
+
     isEmpty() {
         return this.heap.length === 0;
     }
-
 }
 
 export default MaxHeap;

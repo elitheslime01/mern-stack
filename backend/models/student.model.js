@@ -18,9 +18,14 @@ const studentSchema = new mongoose.Schema({
         type: Number,
         default: 0, 
     },
-    attendedSlots: { 
-        type: Number, 
-        default: 0 }
+    attendedSlots: {
+        type: Number,
+        default: 0, 
+    },
+    cycleJoined: {
+        type: Number,
+        default: 0, 
+    }
 }, {
     timestamps: true,
 });

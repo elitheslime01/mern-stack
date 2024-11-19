@@ -27,7 +27,7 @@ const TIME_SLOTS = [
 const getRandomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 // Initialize Students
-const initializeStudents = async (numStudents = 30) => {
+const initializeStudents = async (numStudents = 120) => {
     const students = Array.from({ length: numStudents }, (_, i) => {
         const isAthlete = (i + 1) % 3 === 0;
         return {

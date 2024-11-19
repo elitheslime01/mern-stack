@@ -15,7 +15,7 @@ router.get("/", getQueues);
 router.post("/", createQueue);
 
 // Dequeue a student from a specific queue
-router.patch('/:queueId/dequeue', allocateSlot);
+router.patch('/:queueId/allocateSlots', allocateSlot);
 
 // Get queue for a specific schedule
 router.get('/schedule/:scheduleID', getQueueForSchedule);

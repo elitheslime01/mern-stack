@@ -1,6 +1,8 @@
 import Queue from "../models/queue.model.js";
-import Booking from "../models/booking.model.js";
+import Student from "../models/student.model.js";
 import Schedule from "../models/schedule.model.js";
+import Booking from "../models/booking.model.js";
+import { createBooking } from "../controllers/booking.controller.js"; // Add this line
 import MaxHeap from "../utils/priorityQueue.js"; 
 import mongoose from "mongoose";
 
@@ -138,7 +140,7 @@ export const allocateSlot = async (req, res) => {
             if (student) {
                 maxHeap.insert({
                     ...student.toObject(),
-                    unsuccessfulAttempts: athlete.unsuccessfulAttempts,
+                    unsuccessfulAttempts: ordinaryStudent.unsuccessfulAttempts,
                     attendedSlots: student.attendedSlots,
                     noShows: student.noShows,
                     isAthlete: true
